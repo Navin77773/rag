@@ -1,0 +1,63 @@
+# main_script.py
+from langchain.document_loaders import DirectoryLoader, PyPDFLoader
+from langchain.llms import Ollama
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores import Chroma
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from gtesmall2 import gtesmall
+from transformers import AutoModelForCausalLM
+from langchain.llms import CTransformers
+from transcribe import transcribe_audio
+from synthesise_test import synthesise_fn
+from scipy.io.wavfile import write
+import os
+
+pdfs_folder_path = '/home/navin/rag/PDFs'
+llm = Ollama(model="phi", callbacks=[StreamingStdOutCallbackHandler()])
+
+audio_file_path = "audios/WhatsApp Audio 2024-02-22 at 2.28.19 PM.mp4"
+transcription = transcribe_audio(audio_file_path)
+print(transcription)
+question = transcription
+
+raw_documents = DirectoryLoader(pdfs_folder_path, glob="**/*.pdf", loader_cls=PyPDFLoader, show_progress=True, use_multithreading=True).load()
+
+assert raw_documents, "No documents found in the specified folder."
+
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+documents = text_splitter.split_documents(raw_documents)
+
+assert documents, "No documents were split into chunks."
+
+print("Loading documents into Chroma\n")
+db = Chroma.from_documents(documents, gtesmall())
+
+print(f"Answering question: {question}\n")
+
+prompt_template = """
+# ... (your prompt template here) ...
+"""
+
+PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+
+print(PROMPT)
+
+qa_chain = RetrievalQA.from_chain_type(
+    llm,
+    retriever=db.as_retriever(search_kwargs={"k": 3}),
+    chain_type_kwargs={'prompt': PROMPT}
+)
+
+def answer_llm():
+    return qa_chain({"query": question})
+
+text_to_synthesize = answer_llm()
+audio = synthesise_fn(text_to_synthesize)
+
+output_directory = "output_audios"
+os.makedirs(output_directory, exist_ok=True)
+
+output_file_path = os.path.join(output_directory, "output_audio.wav")
+write(output_file_path, rate=22050, data=audio.numpy())
