@@ -1,4 +1,3 @@
-# Import necessary libraries
 from langchain.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain.llms import Ollama
 from langchain.text_splitter import CharacterTextSplitter
@@ -7,24 +6,12 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from gtesmall2 import gtesmall
-from transformers import AutoModelForCausalLM
-from langchain.llms import CTransformers
-from transcribe import transcribe_audio
-from synthesise_test import synthesise_fn
-from scipy.io.wavfile import write
-import os
 
-# Set the correct path to the "PDFs" folder
+# Set the correct path to the "PDFs" folder in your Google Drive
 pdfs_folder_path = '/home/navin/rag/PDFs'
 
 # Load model directly
 llm = Ollama(model="phi", callbacks=[StreamingStdOutCallbackHandler()])
-
-# Define the question to be answered
-audio_file_path = "audios/WhatsApp Audio 2024-02-22 at 3.43.57 PM.mp4"
-transcription = transcribe_audio(audio_file_path)
-print(transcription)
-question = transcription
 
 # Initialize the directory loader with the correct path
 raw_documents = DirectoryLoader(pdfs_folder_path,
@@ -46,15 +33,14 @@ assert documents, "No documents were split into chunks."
 print("Loading documents into Chroma\n")
 db = Chroma.from_documents(documents, gtesmall())
 
-print(f"Answering question: {question}\n")
-
 prompt_template = """
+
 ### Instruction:
 You are a helpful Educational Assistant who answers users' questions based on multiple contexts given to you.
 
 Keep your answer short and to the point.
 
-The evidence is the context of the PDF extract with metadata.
+The evidence is the context of the pdf extract with metadata.
 
 Carefully focus on the metadata, especially 'filename' and 'page' whenever answering.
 
@@ -67,9 +53,12 @@ Reply "Not applicable" if the text is irrelevant.
 
 ## Question:
 {question}
+
 """
 
-PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+PROMPT = PromptTemplate(
+    template=prompt_template, input_variables=["context", "question"]
+)
 
 qa_chain = RetrievalQA.from_chain_type(
     llm,
@@ -77,14 +66,52 @@ qa_chain = RetrievalQA.from_chain_type(
     chain_type_kwargs={'prompt': PROMPT}
 )
 
-# Get the answer
-text_to_synthesize = qa_chain({"query": question})
 
-# Synthesize the text to audio
-audio = synthesise_fn(text_to_synthesize)
+def conversation_chat(user_input, history):
+    question = user_input  # Set user input as the question
+    result = qa_chain({"query": question})
 
-# Save the audio as a WAV file
-output_directory = "output_audios"
-os.makedirs(output_directory, exist_ok=True)
-output_file_path = os.path.join(output_directory, "output_audio.wav")
-write(output_file_path, rate=22050, data=audio.numpy())
+    # Check if "result" is present in the result dictionary
+    if "result" in result:
+        answer = result["result"]
+    else:
+        print(f"Error: {result.get('error_message', 'Unknown error')}")
+        print("Full Response:", result)  # Print the full response for debugging
+        answer = "Sorry, I couldn't find an answer."
+
+    history.append((question, answer))
+    return answer
+
+
+def initialize_session_state():
+    history = []
+    generated = ["Hello! Ask me anything about 🤗"]
+    past = ["Hey! 👋"]
+    return history, generated, past
+
+
+def display_chat_history(history, generated, past):
+    for i in range(len(generated)):
+        print(f"User: {past[i]}")
+        print(f"Bot: {generated[i]}")
+
+
+# Initialize session state
+history, generated, past = initialize_session_state()
+
+# Display chat history based on user input
+while True:
+    user_input = input("Question: Ask me anything (type 'exit' to quit): ")
+
+    if user_input.lower() == 'exit':
+        break
+
+    past.append(user_input)  # Append user's input to the history
+
+    # Display chat history
+    display_chat_history(history, generated, past)
+
+    # Run LangChain model only if user doesn't exit
+    if user_input.lower() != 'exit':
+        output = conversation_chat(user_input, history)
+        generated.append(output)
