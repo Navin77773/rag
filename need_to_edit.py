@@ -1,4 +1,3 @@
-# Import necessary libraries
 from langchain.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain.llms import Ollama
 from langchain.text_splitter import CharacterTextSplitter
@@ -14,7 +13,7 @@ from synthesise_test import synthesise_fn
 from scipy.io.wavfile import write
 import os
 
-# Set the correct path to the "PDFs" folder
+# Set the correct path to the "PDFs" folder in your Google Drive
 pdfs_folder_path = '/home/navin/rag/PDFs'
 
 # Load model directly
@@ -46,15 +45,14 @@ assert documents, "No documents were split into chunks."
 print("Loading documents into Chroma\n")
 db = Chroma.from_documents(documents, gtesmall())
 
-print(f"Answering question: {question}\n")
-
 prompt_template = """
+
 ### Instruction:
 You are a helpful Educational Assistant who answers users' questions based on multiple contexts given to you.
 
 Keep your answer short and to the point.
 
-The evidence is the context of the PDF extract with metadata.
+The evidence is the context of the pdf extract with metadata.
 
 Carefully focus on the metadata, especially 'filename' and 'page' whenever answering.
 
@@ -67,9 +65,12 @@ Reply "Not applicable" if the text is irrelevant.
 
 ## Question:
 {question}
+
 """
 
-PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+PROMPT = PromptTemplate(
+    template=prompt_template, input_variables=["context", "question"]
+)
 
 qa_chain = RetrievalQA.from_chain_type(
     llm,
@@ -77,17 +78,28 @@ qa_chain = RetrievalQA.from_chain_type(
     chain_type_kwargs={'prompt': PROMPT}
 )
 
-# Get the answer
-text_to_synthesize = qa_chain({"query": question})
+# Get the answer directly
+qa_result = qa_chain({"query": question}).get("result")
+
+# Check if result is present in the response
+if qa_result and "Not applicable" not in qa_result:
+    print("QA Result:", qa_result)
+    text_to_synthesize = qa_result
+else:
+    print("Not applicable or error in QA result.")
+    text_to_synthesize = "Not applicable"
 
 # Ensure text_to_synthesize is a single string
-text_to_synthesize = text_to_synthesize["response"]["context"]
+text_to_synthesize = str(text_to_synthesize)
 
-# Synthesize the text to audio
-audio = synthesise_fn(text_to_synthesize)
+# Synthesize the text to audio only if the result is applicable
+if "Not applicable" not in text_to_synthesize:
+    audio = synthesise_fn(text_to_synthesize)
 
-# Save the audio as a WAV file
-output_directory = "output_audios"
-os.makedirs(output_directory, exist_ok=True)
-output_file_path = os.path.join(output_directory, "output_audio.wav")
-write(output_file_path, rate=22050, data=audio.numpy())
+    # Save the audio as a WAV file
+    output_directory = "output_audios"
+    os.makedirs(output_directory, exist_ok=True)
+    output_file_path = os.path.join(output_directory, "output_audio.wav")
+    write(output_file_path, rate=22050, data=audio.numpy())
+else:
+    print("Skipping audio synthesis as the result is not applicable.")

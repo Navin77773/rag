@@ -67,7 +67,7 @@ qa_chain = RetrievalQA.from_chain_type(
 )
 
 
-def conversation_chat(user_input, history):
+def conversation_chat(user_input, history, generated, past):
     question = user_input  # Set user input as the question
     result = qa_chain({"query": question})
 
@@ -80,19 +80,28 @@ def conversation_chat(user_input, history):
         answer = "Sorry, I couldn't find an answer."
 
     history.append((question, answer))
-    return answer
+    past.append(user_input)  # Append user's input to the history
+    generated.append(answer)  # Update the generated list with the current answer
+
+    # Check if the answer contains a valid response or if it's a generated question
+    if "ask me anything" not in answer.lower():
+        return answer
+    else:
+        print("Generated question detected. Please ask a specific question.")
+        return "Not applicable"
 
 
 def initialize_session_state():
     history = []
-    generated = ["Hello! Ask me anything about 🤗"]
+    generated = []
     past = ["Hey! 👋"]
     return history, generated, past
 
 
 def display_chat_history(history, generated, past):
     for i in range(len(generated)):
-        print(f"User: {past[i]}")
+        if i < len(past):  # Check if i is within the range of past
+            print(f"User: {past[i]}")
         print(f"Bot: {generated[i]}")
 
 
@@ -106,12 +115,10 @@ while True:
     if user_input.lower() == 'exit':
         break
 
-    past.append(user_input)  # Append user's input to the history
-
-    # Display chat history
+    # Display chat history before processing the user's input
     display_chat_history(history, generated, past)
 
-    # Run LangChain model only if user doesn't exit
+    # Run LangChain model only if the user doesn't exit
     if user_input.lower() != 'exit':
-        output = conversation_chat(user_input, history)
+        output = conversation_chat(user_input, history, generated, past)
         generated.append(output)
