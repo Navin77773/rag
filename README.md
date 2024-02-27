@@ -1,6 +1,6 @@
 Project Name: Hue Chip - RAG LLM
 Description
-Hue Chip - RAG LLM is a general-purpose educational chatbot leveraging the power of Rapid Automatic Genre (RAG) classification and Large Language Models (LLM). This chatbot is designed to provide a versatile and interactive educational experience for users across various domains.
+Hue Chip - RAG LLM is a general-purpose educational chatbot leveraging the power of Retrival Augmented Generation (RAG)  and Large Language Models (LLM). This chatbot is designed to provide a versatile and interactive educational experience for users across various domains.
 
 Key Features
 RAG : The chatbot utilizes RAG  to understand and categorize user queries, allowing for a more context-aware and efficient interaction.
@@ -11,9 +11,11 @@ General Purpose Knowledge: EduBot is designed to cover a wide range of education
 
 Interactive Learning: The chatbot engages users in interactive learning experiences, providing explanations, answering questions, and offering additional resources to enhance understanding.
 
-main.py: This file contains the core code for Rapid Automatic Genre (RAG) classification, including a history feature. The RAG classification is employed to analyze and categorize text data.
+main.py: This file contains the core code for Rapid Automatic Genre (RAG) classification, without including a history feature. The RAG classification is employed to analyze and categorize text data.
 
 need_to_edit: This directory includes the code base for RAG classification but without the history feature. Additionally, it features functionality for converting text to audio (text_to_audio) and audio to text (audio_to_text).
+
+PS: the code along with history feature is saved in a file updated_main in archieve section
 
 synthesise and transcribe: These modules contain code for speech-to-text and text-to-speech functionalities, utilizing live audio input. The synthesis and transcription processes enhance the overall versatility of the library.
 
