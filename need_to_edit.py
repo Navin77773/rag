@@ -8,7 +8,7 @@ from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from gtesmall2 import gtesmall
 from transformers import AutoModelForCausalLM
 from langchain.llms import CTransformers
-from transcribe import transcribe_audio
+from transcribe_test import transcribe_audio
 from synthesise_test import synthesise_fn
 from scipy.io.wavfile import write
 import os
@@ -26,17 +26,13 @@ print(transcription)
 question = transcription
 
 # Initialize the directory loader with the correct path
-raw_documents = DirectoryLoader(pdfs_folder_path,
-                                glob="**/*.pdf",
-                                loader_cls=PyPDFLoader,
-                                show_progress=True,
-                                use_multithreading=True).load()
+loader = DirectoryLoader('PDFs', use_multithreading=True, silent_errors=True,loader_cls=PyPDFLoader).load()
 
 # Verify that raw_documents is not empty
-assert raw_documents, "No documents found in the specified folder."
+assert loader, "No documents found in the specified folder."
 
 text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-documents = text_splitter.split_documents(raw_documents)
+documents = text_splitter.split_documents(loader)
 
 # Verify that documents is not empty
 assert documents, "No documents were split into chunks."
