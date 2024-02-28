@@ -4,9 +4,10 @@ accelerate
 bitsandbytes
 transformers
 sentence_transformers
-streamlit
-streamlit_chat
 faiss-cpu
 altair
 tiktoken
- huggingface-hub
+datasets
+sentencepiece
+ffmpeg
+chromadb
