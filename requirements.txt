@@ -5,9 +5,16 @@ bitsandbytes
 transformers
 sentence_transformers
 faiss-cpu
-altair
+#altair
 tiktoken
 datasets
 sentencepiece
 ffmpeg
 chromadb
+typing
+scipy
+os
+subprocess
+sys
+pypdf
+unstructured

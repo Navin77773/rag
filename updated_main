@@ -1,0 +1,136 @@
+from langchain.document_loaders import DirectoryLoader, PyPDFLoader
+from langchain.llms import Ollama
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores import Chroma
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from gtesmall2 import gtesmall
+
+# Initialize a dictionary to store conversations
+conversations = {}
+
+def initialize_session_state(conversation_name):
+    history = []
+    generated = []
+    past = ["Hey! 👋"]
+    conversations[conversation_name] = {'history': history, 'generated': generated, 'past': past}
+
+def display_chat_history(conversation_name):
+    conversation = conversations.get(conversation_name, {})
+    history = conversation.get('history', [])
+    generated = conversation.get('generated', [])
+    past = conversation.get('past', [])
+
+    for i in range(len(generated)):
+        if i < len(past):
+            print(f"User: {past[i]}")
+        print(f"Bot: {generated[i]}")
+
+def conversation_chat(user_input, history, generated, past, conversation_name):
+    if user_input.lower() == 'back':
+        print(f"Exiting conversation '{conversation_name}'.")
+        return "Not applicable"
+
+    question = user_input  # Set user input as the question
+    result = qa_chain({"query": question})
+
+    # Check if "result" is present in the result dictionary
+    if "result" in result:
+        answer = result["result"]
+    else:
+        print(f"Error: {result.get('error_message', 'Unknown error')}")
+        print("Full Response:", result)  # Print the full response for debugging
+        answer = "Sorry, I couldn't find an answer."
+
+    history.append((question, answer))
+    past.append(user_input)  # Append user's input to the history
+    generated.append(answer)  # Update the generated list with the current answer
+
+    # Check if the answer contains a valid response or if it's a generated question
+    if "ask me anything" not in answer.lower():
+        return answer
+    else:
+        print("Generated question detected. Please ask a specific question.")
+        return "Not applicable"
+
+# Set the correct path to the "PDFs" folder in your Google Drive
+pdfs_folder_path = '/home/navin/rag/PDFs'
+
+# Load model directly
+llm = Ollama(model="phi", callbacks=[StreamingStdOutCallbackHandler()])
+
+# Initialize the directory loader with the correct path
+loader = DirectoryLoader('PDFs', use_multithreading=True, silent_errors=True, loader_cls=PyPDFLoader).load()
+
+# Verify that raw_documents is not empty
+assert loader, "No documents found in the specified folder."
+
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+documents = text_splitter.split_documents(loader)
+
+# Verify that documents are not empty
+assert documents, "No documents were split into chunks."
+
+# Load the embeddings into Chroma
+print("Loading documents into Chroma\n")
+db = Chroma.from_documents(documents, gtesmall())
+
+prompt_template = """
+### Instruction:
+Greetings! You are an enthusiastic Educational Assistant ready to assist. Craft your responses in a professional and helpful tone.
+
+Provide concise answers based on the given context and metadata. If the context is irrelevant, respond directly to the question, excluding unnecessary details.
+
+Maintain clarity and a positive demeanor throughout.
+
+## Research:
+{context}
+
+## Question:
+{question}
+"""
+
+PROMPT = PromptTemplate(
+    template=prompt_template, input_variables=["context", "question"]
+)
+
+qa_chain = RetrievalQA.from_chain_type(
+    llm,
+    retriever=db.as_retriever(search_kwargs={"k": 8}),
+    chain_type_kwargs={'prompt': PROMPT}
+)
+
+# Main Loop
+while True:
+    conversation_name = input("Enter conversation name: ")  # Get conversation name from the user
+
+    if conversation_name in conversations:
+        choice = input(f"Conversation '{conversation_name}' already exists. Do you want to continue (C) or create a new one (N)? ").lower()
+        if choice == 'c':
+            break  # Continue with the existing conversation
+        elif choice == 'n':
+            continue  # Create a new conversation
+        else:
+            print("Invalid choice. Please enter 'C' to continue or 'N' to create a new conversation.")
+            continue
+
+    initialize_session_state(conversation_name)
+
+    while True:
+        user_input = input("Question: Ask me anything (type 'back' to exit from the current conversation, 'exit' to quit): ")
+
+        if user_input.lower() == 'exit':
+            print("Exiting the program.")
+            exit()
+
+        if user_input.lower() == 'back':
+            print("Exiting the current conversation.")
+            break
+
+        display_chat_history(conversation_name)  # Display chat history before processing the user's input
+
+        output = conversation_chat(user_input, conversations[conversation_name]['history'],
+                                    conversations[conversation_name]['generated'],
+                                    conversations[conversation_name]['past'], conversation_name)
+        conversations[conversation_name]['generated'].append(output)
