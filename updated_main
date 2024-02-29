@@ -1,7 +1,7 @@
-from langchain.document_loaders import DirectoryLoader, PyPDFLoader
-from langchain.llms import Ollama
+from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
+from langchain_community.llms import Ollama
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
@@ -13,7 +13,7 @@ conversations = {}
 def initialize_session_state(conversation_name):
     history = []
     generated = []
-    past = ["Hey! 👋"]
+    past = []
     conversations[conversation_name] = {'history': history, 'generated': generated, 'past': past}
 
 def display_chat_history(conversation_name):
@@ -45,6 +45,12 @@ def conversation_chat(user_input, history, generated, past, conversation_name):
 
     history.append((question, answer))
     past.append(user_input)  # Append user's input to the history
+
+    # Check if the answer has already been generated for this question
+    if answer in generated:
+        print("This answer has already been provided.")
+        return "Not applicable"
+
     generated.append(answer)  # Update the generated list with the current answer
 
     # Check if the answer contains a valid response or if it's a generated question
@@ -55,7 +61,7 @@ def conversation_chat(user_input, history, generated, past, conversation_name):
         return "Not applicable"
 
 # Set the correct path to the "PDFs" folder in your Google Drive
-pdfs_folder_path = '/home/navin/rag/PDFs'
+pdfs_folder_path = 'PDFs'
 
 # Load model directly
 llm = Ollama(model="phi", callbacks=[StreamingStdOutCallbackHandler()])
@@ -81,6 +87,9 @@ prompt_template = """
 Greetings! You are an enthusiastic Educational Assistant ready to assist. Craft your responses in a professional and helpful tone.
 
 Provide concise answers based on the given context and metadata. If the context is irrelevant, respond directly to the question, excluding unnecessary details.
+If the query is generic , give short answers and ask the user to provide more context.
+
+Always process the context , do not directly display it as output
 
 Maintain clarity and a positive demeanor throughout.
 
@@ -108,9 +117,11 @@ while True:
     if conversation_name in conversations:
         choice = input(f"Conversation '{conversation_name}' already exists. Do you want to continue (C) or create a new one (N)? ").lower()
         if choice == 'c':
-            break  # Continue with the existing conversation
+            # continue with the existing conversation
+            break  
         elif choice == 'n':
-            continue  # Create a new conversation
+            # create a new conversation
+            continue  
         else:
             print("Invalid choice. Please enter 'C' to continue or 'N' to create a new conversation.")
             continue
